@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProofPath | Modern Locality Proof</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Poppins', sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        #map { height: 200px; width: 100%; border-radius: 20px; box-shadow: inset 0 0 10px rgba(0,0,0,0.1); }
+        #camera-stream, #photo-preview { 
+            width: 100%; 
+            max-width: 400px; 
+            border-radius: 25px; 
+            border: 4px solid white; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        .btn-gradient {
+            background: linear-gradient(to right, #ff416c, #ff4b2b);
+            transition: all 0.3s ease;
+        }
+        .btn-gradient:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(255, 65, 108, 0.4);
+        }
+        .status-pill {
+            padding: 2px 12px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .status-pending { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+        .status-solved { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+        .status-unsolved { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        
+        .page-transition {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="p-4">
+
+    <!-- FLOATING NAV -->
+    <nav class="max-w-md mx-auto mb-6 glass rounded-full p-2 flex justify-between items-center shadow-2xl sticky top-4 z-[1000]">
+        <h1 class="font-bold text-indigo-700 ml-4 text-lg">ProofPath</h1>
+        <div class="flex gap-1">
+            <button onclick="showPage('capture-page')" class="text-xs font-semibold px-4 py-2 rounded-full hover:bg-indigo-100 transition">Report</button>
+            <button onclick="showPage('user-dashboard')" class="text-xs font-semibold px-4 py-2 rounded-full hover:bg-indigo-100 transition">My Proofs</button>
+            <button onclick="showPage('head-dashboard')" class="text-xs font-semibold px-4 py-2 rounded-full bg-indigo-600 text-white shadow-md">Head Panel</button>
+        </div>
+    </nav>
+
+    <!-- PAGE 1: CAPTURE REPORT -->
+    <div id="capture-page" class="page page-transition p-2 max-w-md mx-auto">
+        <div class="glass p-6 rounded-[30px] shadow-2xl">
+            <h2 class="text-2xl font-bold text-center mb-6 text-gray-800">Report Locality Issue</h2>
+            
+            <div class="flex flex-col items-center mb-6">
+                <video id="camera-stream" autoplay playsinline class="bg-black mb-4"></video>
+                <img id="photo-preview" class="hidden bg-black mb-4">
+                <canvas id="photo-canvas" class="hidden"></canvas>
+                
+                <div class="flex gap-3">
+                    <button id="capture-btn" class="btn-gradient text-white px-8 py-3 rounded-full font-bold shadow-lg">📸 Capture Proof</button>
+                    <button id="retake-btn" class="hidden bg-gray-200 text-gray-700 px-8 py-3 rounded-full font-bold hover:bg-gray-300 transition">🔄 Retake</button>
+                    <button id="submit-btn" class="hidden bg-green-500 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-green-600 transition">✅ Submit</button>
+                </div>
+            </div>
+
+            <div id="head-card" class="hidden mb-6 p-4 bg-white rounded-2xl shadow-sm border-l-4 border-indigo-500 flex items-center gap-4">
+                <div class="bg-indigo-100 p-2 rounded-full">
+                    <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" class="w-8 h-8">
+                </div>
+                <div>
+                    <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Assigned Locality Head</p>
+                    <h3 id="head-name" class="text-md font-bold text-gray-800">Searching...</h3>
+                </div>
+            </div>
+
+            <div id="description-section" class="hidden mb-6">
+                <label class="block text-sm font-bold text-gray-600 mb-2 ml-1">What's the problem?</label>
+                <textarea id="problem-text" class="w-full p-4 border-0 rounded-2xl bg-gray-100 focus:ring-2 focus:ring-indigo-400 outline-none transition" rows="3" placeholder="Describe the issue in detail..."></textarea>
+            </div>
+
+            <div id="map" class="mb-4"></div>
+            <p id="location-text" class="text-center text-xs font-medium text-gray-500">🛰️ Connecting to Satellite...</p>
+        </div>
+    </div>
+
+    <!-- PAGE 2: USER DASHBOARD -->
+    <div id="user-dashboard" class="page hidden page-transition p-2 max-w-md mx-auto">
+        <h2 class="text-2xl font-bold mb-6 text-white text-center">Your Proof History</h2>
+        <div id="user-reports-list" class="flex flex-col gap-4">
+            <!-- Reports inject here -->
+        </div>
+    </div>
+
+    <!-- PAGE 3: HEAD DASHBOARD -->
+    <div id="head-dashboard" class="page hidden page-transition p-2 max-w-md mx-auto">
+        <h2 class="text-2xl font-bold mb-6 text-white text-center">Admin Control Panel</h2>
+        <div id="head-reports-list" class="flex flex-col gap-4">
+            <!-- Admin reports inject here -->
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const localityHeads = [{ name: "John Doe", area: "Central Sector", lat: 0, lon: 0 }];
+        let reports = JSON.parse(localStorage.getItem('proofpath_reports')) || [];
+
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+            document.getElementById(pageId).classList.remove('hidden');
+            if(pageId === 'user-dashboard') renderUserReports();
+            if(pageId === 'head-dashboard') renderHeadReports();
+        }
+
+        // --- Camera & Map Logic ---
+        const video = document.getElementById('camera-stream');
+        const canvas = document.getElementById('photo-canvas');
+        const preview = document.getElementById('photo-preview');
+        const locationText = document.getElementById('location-text');
+        let currentCoords = { lat: 0, lon: 0 };
+
+        const map = L.map('map').setView([0,0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        async function init() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+            } catch (e) { alert("Camera permission needed!"); }
+
+            navigator.geolocation.getCurrentPosition(p => {
+                currentCoords = { lat: p.coords.latitude, lon: p.coords.longitude };
+                map.setView([currentCoords.lat, currentCoords.lon], 15);
+                L.marker([currentCoords.lat, currentCoords.lon]).addTo(map);
+                locationText.innerText = "📍 Location Verified ✓";
+            });
+        }
+
+        document.getElementById('capture-btn').onclick = () => {
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            preview.src = canvas.toDataURL('image/png');
+            
+            document.getElementById('head-name').innerText = localityHeads[0].name;
+            document.getElementById('head-card').classList.remove('hidden');
+            document.getElementById('description-section').classList.remove('hidden');
+            video.classList.add('hidden'); preview.classList.remove('hidden');
+            document.getElementById('capture-btn').classList.add('hidden');
+            document.getElementById('retake-btn').classList.remove('hidden');
+            document.getElementById('submit-btn').classList.remove('hidden');
+        };
+
+        document.getElementById('retake-btn').onclick = () => location.reload();
+
+        document.getElementById('submit-btn').onclick = () => {
+            const desc = document.getElementById('problem-text').value;
+            if(!desc) return alert("Please describe the problem!");
+            
+            const report = {
+                id: Date.now(),
+                image: preview.src,
+                desc: desc,
+                head: localityHeads[0].name,
+                status: 'Pending',
+                response: '',
+                date: new Date().toLocaleDateString()
+            };
+            reports.push(report);
+            localStorage.setItem('proofpath_reports', JSON.stringify(reports));
+            alert("🚀 Proof submitted successfully!");
+            showPage('user-dashboard');
+        };
+
+        function renderUserReports() {
+            const list = document.getElementById('user-reports-list');
+            list.innerHTML = reports.length ? '' : '<p class="text-center text-white opacity-60">No reports found.</p>';
+            reports.forEach(r => {
+                list.innerHTML += `
+                    <div class="glass p-4 rounded-3xl shadow-lg flex gap-4 items-center animate-fadeIn">
+                        <img src="${r.image}" class="w-20 h-20 rounded-2xl object-cover border-2 border-white shadow-sm">
+                        <div class="flex-1">
+                            <div class="flex justify-between items-start">
+                                <p class="text-sm font-bold text-gray-800 leading-tight mb-1">${r.desc}</p>
+                                <span class="status-pill status-${r.status.toLowerCase()}">${r.status}</span>
+                            </div>
+                            <p class="text-xs text-gray-500 italic">${r.response || 'Awaiting head response...'}</p>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        function renderHeadReports() {
+            const list = document.getElementById('head-reports-list');
+            const pending = reports.filter(r => r.status === 'Pending');
+            list.innerHTML = pending.length ? '' : '<p class="text-center text-white opacity-60">No pending issues.</p>';
+            pending.forEach(r => {
+                list.innerHTML += `
+                    <div class="glass p-5 rounded-3xl shadow-xl border-t-4 border-indigo-500">
+                        <img src="${r.image}" class="w-full h-40 object-cover rounded-2xl mb-4 shadow-md">
+                        <p class="font-bold text-gray-800 mb-3">${r.desc}</p>
+                        <textarea id="res-${r.id}" class="w-full p-3 bg-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400 mb-4" placeholder="Write your response..."></textarea>
+                        <div class="flex gap-2">
+                            <button onclick="updateStatus(${r.id}, 'Solved')" class="flex-1 bg-green-500 text-white py-2 rounded-xl text-xs font-bold hover:bg-green-600 transition">Mark Solved</button>
+                            <button onclick="updateStatus(${r.id}, 'Unsolved')" class="flex-1 bg-red-500 text-white py-2 rounded-xl text-xs font-bold hover:bg-red-600 transition">Mark Unsolved</button>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        function updateStatus(id, newStatus) {
+            const res = document.getElementById(`res-${id}`).value;
+            reports = reports.map(r => r.id === id ? { ...r, status: newStatus, response: res } : r);
+            localStorage.setItem('proofpath_reports', JSON.stringify(reports));
+            renderHeadReports();
+            alert("✅ Status Updated!");
+        }
+
+        init();
+    </script>
+</body>
+</html>

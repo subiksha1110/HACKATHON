@@ -1,0 +1,120 @@
+import sqlite3
+from pathlib import Path
+
+DATABASE = Path(__file__).parent / "issues.db"
+
+
+def get_connection():
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+def create_database():
+    with get_connection() as conn:
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS complaints (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            complaint_id TEXT UNIQUE NOT NULL,
+            user_name TEXT,
+            category TEXT NOT NULL,
+            photo_filename TEXT NOT NULL,
+            location TEXT NOT NULL,
+            description TEXT NOT NULL,
+            ai_summary TEXT,
+            suggested_department TEXT,
+            assigned_department TEXT,
+            priority TEXT DEFAULT 'Medium'
+                CHECK(priority IN ('Low', 'Medium', 'High')),
+            status TEXT NOT NULL DEFAULT 'Pending'
+                CHECK(status IN (
+                    'Pending', 'In Progress', 'Resolved'
+                )),
+            created_at TEXT NOT NULL DEFAULT
+                (datetime('now', 'localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS admins (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL
+        );
+        """)
+
+
+def add_complaint(
+    complaint_id,
+    category,
+    photo_filename,
+    location,
+    description,
+    user_name=None
+):
+    with get_connection() as conn:
+        conn.execute("""
+            INSERT INTO complaints (
+                complaint_id, user_name, category,
+                photo_filename, location, description
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            complaint_id, user_name, category,
+            photo_filename, location, description
+        ))
+
+
+def get_complaint(complaint_id):
+    with get_connection() as conn:
+        return conn.execute("""
+            SELECT * FROM complaints
+            WHERE complaint_id = ?
+        """, (complaint_id,)).fetchone()
+
+
+def get_all_complaints():
+    with get_connection() as conn:
+        return conn.execute("""
+            SELECT * FROM complaints
+            ORDER BY id DESC
+        """).fetchall()
+
+
+def update_ai_analysis(
+    complaint_id, summary, department, priority
+):
+    if priority not in ("Low", "Medium", "High"):
+        raise ValueError("Invalid priority")
+
+    with get_connection() as conn:
+        conn.execute("""
+            UPDATE complaints
+            SET ai_summary = ?,
+                suggested_department = ?,
+                priority = ?
+            WHERE complaint_id = ?
+        """, (summary, department, priority, complaint_id))
+
+
+def update_complaint_status(complaint_id, status):
+    allowed_statuses = (
+        "Pending", "In Progress", "Resolved"
+    )
+
+    if status not in allowed_statuses:
+        raise ValueError("Invalid complaint status")
+
+    with get_connection() as conn:
+        cursor = conn.execute("""
+            UPDATE complaints
+            SET status = ?
+            WHERE complaint_id = ?
+        """, (status, complaint_id))
+
+        return cursor.rowcount > 0
+
+
+if __name__ == "__main__":
+    create_database()
+    print("ProofPath complaint database created successfully!")
+    print(f"Database location: {DATABASE}")
